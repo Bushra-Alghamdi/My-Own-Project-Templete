@@ -1,0 +1,79 @@
+name: Test project
+on: 
+  # run tests on push to main branch and all Pull Requests
+  push:
+    branches:
+      - main 
+  pull_request:
+
+jobs:
+  testAllModes:
+    name: Run All Tests
+    
+    # Platform
+    runs-on: ubuntu-latest
+
+    # Check to skip CI tests
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    
+    strategy:
+      fail-fast: false
+      
+      # Test Matrix
+      matrix:
+        # Path to project folder, default is the "current" (root) folder
+        projectPath:
+          - . 
+
+        # Target version of Unity to use
+        unityVersion:
+          - 2021.1.13f1
+#           - 2020.3.1f1  
+
+        # Target platform to build, default is WebGL
+        targetPlatform:
+          - WebGL # WebGL.
+#           - StandaloneOSX # Build a macOS standalone (Intel 64-bit).
+#           - StandaloneWindows64 # Build a Windows 64-bit standalone.
+#           - StandaloneLinux64 # Build a Linux 64-bit standalone.
+#           - iOS # Build an iOS player.
+#           - Android # Build an Android player.
+  
+    # Stops the test script after set amount of time
+    timeout-minutes: 15
+
+    steps:
+
+      # Checkout
+      - uses: actions/checkout@v2
+        with:
+          lfs: true
+
+      # Cache
+      - name: Cache Library
+        uses: actions/cache@v2
+        with:
+          path: ${{ matrix.projectPath }}/Library
+          key: Library-${{ matrix.projectPath }}-${{ matrix.targetPlatform }}
+          restore-keys: |
+            Library-${{ matrix.projectPath }}-
+            Library-
+
+      # Test
+      - uses: game-ci/unity-test-runner@v2.0-alpha-5
+        id: testRunner
+        env:
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+        with:
+          projectPath: ${{ matrix.projectPath }}
+          unityVersion: ${{ matrix.unityVersion }}
+          githubToken: ${{ secrets.GITHUB_TOKEN }}
+
+      # Output
+      - uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: Test results (all modes)
+          path: ${{ steps.testRunner.outputs.artifactsPath }}
